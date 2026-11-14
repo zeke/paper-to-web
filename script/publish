@@ -1,0 +1,6 @@
+#!/bin/sh
+# Export Paper pages to R2. Paper Desktop must be open.
+# Usage: script/publish [--local] [--background <color>] [<paper page url> ...]
+set -e
+cd "$(dirname "$0")/.."
+exec node src/publish.mjs "$@"

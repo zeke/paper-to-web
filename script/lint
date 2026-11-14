@@ -1,0 +1,6 @@
+#!/bin/sh
+# Typecheck the Worker and syntax-check the JavaScript.
+set -e
+cd "$(dirname "$0")/.."
+npm run typecheck
+for f in src/*.mjs src/viewer/*.js test/*.mjs; do node --check "$f"; done
