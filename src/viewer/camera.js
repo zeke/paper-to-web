@@ -33,6 +33,38 @@ export const centerOn = (wx, wy, z, vw, vh) => ({ x: vw / 2 - wx * z, y: vh / 2 
 
 export const worldCenter = (cam, vw, vh) => ({ x: (vw / 2 - cam.x) / cam.z, y: (vh / 2 - cam.y) / cam.z });
 
+// Indices of boards in reading order: rows top to bottom, then left to right.
+// A board joins a row when its top is above the middle of the row's first board.
+export function readingOrder(boards) {
+	const byY = boards.map((b, i) => ({ ...b, i })).sort((a, b) => a.y - b.y || a.x - b.x);
+	const rows = [];
+	for (const b of byY) {
+		const row = rows.at(-1);
+		if (row && b.y < row[0].y + row[0].h / 2) row.push(b);
+		else rows.push([b]);
+	}
+	return rows.flatMap((row) => row.sort((a, b) => a.x - b.x).map((b) => b.i));
+}
+
+// Index of the board whose center is closest to world point (wx, wy).
+export function nearest(boards, wx, wy) {
+	let best = 0;
+	let bestD = Infinity;
+	boards.forEach((b, i) => {
+		const d = Math.hypot(b.x + b.w / 2 - wx, b.y + b.h / 2 - wy);
+		if (d < bestD) [best, bestD] = [i, d];
+	});
+	return best;
+}
+
+// Camera partway (t in 0..1) between two cameras: the world center moves linearly and zoom geometrically.
+export function between(from, to, t, vw, vh) {
+	const a = worldCenter(from, vw, vh);
+	const b = worldCenter(to, vw, vh);
+	const z = from.z * (to.z / from.z) ** t;
+	return centerOn(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, z, vw, vh);
+}
+
 // Wheel delta (pixels) to zoom factor. Trackpad pinches send small deltas, mouse wheels large ones.
 export function wheelZoomFactor(deltaY) {
 	const d = Math.max(-50, Math.min(50, deltaY));

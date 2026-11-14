@@ -3,11 +3,14 @@ import { test } from "node:test";
 import {
 	MAX_ZOOM,
 	MIN_ZOOM,
+	between,
 	bounds,
 	centerOn,
 	fit,
 	formatHash,
+	nearest,
 	parseHash,
+	readingOrder,
 	wheelZoomFactor,
 	worldCenter,
 	zoomAt,
@@ -50,6 +53,35 @@ test("hash round-trips the world center and zoom", () => {
 	assert.deepEqual(worldCenter(cam, 800, 600), { x: 1234, y: -567 });
 	assert.equal(parseHash("#nope"), null);
 	assert.equal(parseHash("#1,2,0"), null);
+});
+
+test("readingOrder goes row by row, left to right, even when tops differ slightly", () => {
+	const boards = [
+		{ x: 3200, y: 2200, w: 1440, h: 1450 },
+		{ x: 1600, y: 10, w: 1440, h: 1509 },
+		{ x: 0, y: 2200, w: 1440, h: 1556 },
+		{ x: 0, y: 0, w: 1440, h: 1755 },
+		{ x: 3200, y: -20, w: 1440, h: 1083 },
+	];
+	assert.deepEqual(readingOrder(boards), [3, 1, 4, 2, 0]);
+});
+
+test("nearest picks the board whose center is closest", () => {
+	const boards = [
+		{ x: 0, y: 0, w: 100, h: 100 },
+		{ x: 200, y: 0, w: 100, h: 100 },
+	];
+	assert.equal(nearest(boards, 40, 50), 0);
+	assert.equal(nearest(boards, 190, 50), 1);
+});
+
+test("between interpolates from one camera to another", () => {
+	const a = centerOn(0, 0, 0.1, 800, 600);
+	const b = centerOn(1000, 500, 1, 800, 600);
+	assert.deepEqual(between(a, b, 0, 800, 600), a);
+	const end = between(a, b, 1, 800, 600);
+	assert.ok(Math.abs(end.x - b.x) < 1e-9 && Math.abs(end.y - b.y) < 1e-9 && Math.abs(end.z - b.z) < 1e-12);
+	assert.ok(Math.abs(between(a, b, 0.5, 800, 600).z - Math.sqrt(0.1)) < 1e-12);
 });
 
 test("wheel zoom direction and limits", () => {

@@ -46,4 +46,4 @@ Manifest: `{ title, background, boards: [{ name, x, y, w, h, lo, hi }] }` in Pap
 
 ## Input map
 
-Touch: one finger pans, pinch zooms, double tap zooms in. Mouse: drag pans, wheel or trackpad scroll pans, Cmd/Ctrl+wheel and trackpad pinch zoom, double-click zooms in (Shift zooms out). Safari trackpad pinch uses `gesture*` events. Keys: arrows pan (Shift for 5x), `+`/`=`/`-` zoom, `0` fits all, `1` is 100%. The view is saved in the URL hash as `#worldX,worldY,zoom`.
+Touch: one finger pans, pinch zooms, double tap zooms in. Mouse: drag pans, wheel or trackpad scroll pans, Cmd/Ctrl+wheel and trackpad pinch zoom, double-click zooms in (Shift zooms out). Safari trackpad pinch uses `gesture*` events. Keys: Right/Down fit the next board and Left/Up the previous one, in reading order (rows top to bottom, then left to right), wrapping at the ends, with a 300ms animation (instant under `prefers-reduced-motion`). After manual pan or zoom, stepping starts from the board nearest the center, or from the first/last board when everything is in view. `+`/`=`/`-` zoom, `0` fits all, `1` is 100%. The view is saved in the URL hash as `#worldX,worldY,zoom`.

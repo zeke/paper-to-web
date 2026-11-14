@@ -1,10 +1,13 @@
 import {
+	between,
 	bounds,
 	centerOn,
 	fit,
 	formatHash,
+	nearest,
 	pan,
 	parseHash,
+	readingOrder,
 	wheelZoomFactor,
 	worldCenter,
 	zoomAt,
@@ -12,8 +15,8 @@ import {
 
 const PAD = 48;
 const LABEL_GAP = 6;
-const KEY_PAN = 100;
 const KEY_ZOOM = 1.25;
+const ANIMATION_MS = 300;
 // Low-res images are exported at 0.5x. Swap to 2x once they would be upscaled.
 const HI_RES_AT = 0.6;
 
@@ -40,6 +43,11 @@ const vw = () => canvas.clientWidth;
 const vh = () => canvas.clientHeight;
 const fitAll = () => fit(world, vw(), vh(), PAD);
 
+// Arrow keys step through boards in reading order. current is a position in order, or -1 after manual moves.
+const order = readingOrder(boards);
+let current = -1;
+const fitBoard = (i) => fit(boards[order[i]], vw(), vh(), PAD);
+
 let cam = (() => {
 	const h = parseHash(location.hash);
 	return h ? centerOn(h.x, h.y, h.z, vw(), vh()) : fitAll();
@@ -47,7 +55,16 @@ let cam = (() => {
 
 let frame = 0;
 let hashTimer = 0;
+let anim = 0;
+
+// Camera changes from direct manipulation stop any animation and forget the current board.
 function set(next) {
+	cancelAnimationFrame(anim);
+	current = -1;
+	apply(next);
+}
+
+function apply(next) {
 	cam = next;
 	if (!frame) frame = requestAnimationFrame(render);
 	clearTimeout(hashTimer);
@@ -168,26 +185,44 @@ canvas.addEventListener("gesturechange", (e) => {
 });
 canvas.addEventListener("gestureend", (e) => e.preventDefault());
 
+function animateTo(target) {
+	cancelAnimationFrame(anim);
+	if (matchMedia("(prefers-reduced-motion: reduce)").matches) return apply(target);
+	const from = cam;
+	const start = performance.now();
+	const tick = (now) => {
+		const t = Math.min(1, (now - start) / ANIMATION_MS);
+		apply(t < 1 ? between(from, target, 1 - (1 - t) ** 3, vw(), vh()) : target);
+		if (t < 1) anim = requestAnimationFrame(tick);
+	};
+	anim = requestAnimationFrame(tick);
+}
+
+// Move to the next (dir 1) or previous (dir -1) board, wrapping at either end.
+// After manual moves, start from the board nearest the center, or from the ends when everything is in view.
+function step(dir) {
+	const n = order.length;
+	if (current >= 0) current = (current + dir + n) % n;
+	else if (cam.z <= fitAll().z) current = dir > 0 ? 0 : n - 1;
+	else {
+		const c = worldCenter(cam, vw(), vh());
+		current = (order.indexOf(nearest(boards, c.x, c.y)) + dir + n) % n;
+	}
+	animateTo(fitBoard(current));
+}
+
 window.addEventListener("keydown", (e) => {
-	const step = e.shiftKey ? KEY_PAN * 5 : KEY_PAN;
 	const cx = vw() / 2;
 	const cy = vh() / 2;
 	const mod = e.metaKey || e.ctrlKey;
 	if (mod && e.key.startsWith("Arrow")) return; // Leave browser shortcuts like Cmd+Left alone.
+	if (e.key.startsWith("Arrow")) {
+		e.preventDefault();
+		step(e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : -1);
+		return;
+	}
 	let next;
 	switch (e.key) {
-		case "ArrowLeft":
-			next = pan(cam, step, 0);
-			break;
-		case "ArrowRight":
-			next = pan(cam, -step, 0);
-			break;
-		case "ArrowUp":
-			next = pan(cam, 0, step);
-			break;
-		case "ArrowDown":
-			next = pan(cam, 0, -step);
-			break;
 		case "+":
 		case "=":
 			next = zoomAt(cam, KEY_ZOOM, cx, cy);
@@ -210,12 +245,15 @@ window.addEventListener("keydown", (e) => {
 	set(next);
 });
 
-// Keep the same world point centered when the viewport changes size.
+// When the viewport changes size, refit the current board, or keep the same world point centered.
 let size = { w: vw(), h: vh() };
 new ResizeObserver(() => {
 	const c = worldCenter(cam, size.w, size.h);
 	size = { w: vw(), h: vh() };
-	set(centerOn(c.x, c.y, cam.z, size.w, size.h));
+	if (current >= 0) {
+		cancelAnimationFrame(anim);
+		apply(fitBoard(current));
+	} else set(centerOn(c.x, c.y, cam.z, size.w, size.h));
 }).observe(canvas);
 
 render();
