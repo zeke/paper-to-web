@@ -2,14 +2,14 @@
 // Usage: node src/publish.mjs [--local] [--background <css color>] [<paper page url> ...]
 // With no URLs, republishes every page published before.
 import { execFile } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseArgs, promisify } from "node:util";
 import { buildManifest, parsePageUrl, webpSize } from "./manifest.mjs";
 import { Paper } from "./paper.mjs";
-import { STATE, readJSON, writeJSON } from "./state.mjs";
+import { STATE, newPageId, readJSON, writeJSON } from "./state.mjs";
 
 const BUCKET = "paper-to-web";
 const CF = "node_modules/.bin/cf";
@@ -28,7 +28,7 @@ if (!values.local && !BASE_URL) {
 	process.exit(1);
 }
 
-// "<fileId>/<pageId>" -> { id: public UUID, background? }
+// "<fileId>/<pageId>" -> { id: public page ID, background? }
 const pagesFile = join(STATE, "pages.json");
 const pages = await readJSON(pagesFile, {});
 // Image hashes already uploaded, so reruns skip them. Local R2 lives in this checkout, so its list does too.
@@ -56,7 +56,7 @@ const tmp = await mkdtemp(join(tmpdir(), "paper-to-web-"));
 try {
 	for (const key of keys) {
 		const [fileId, pageId] = key.split("/");
-		const page = (pages[key] ??= { id: randomUUID() });
+		const page = (pages[key] ??= { id: newPageId() });
 		if (values.background) page.background = values.background;
 
 		const info = await paper.call("get_basic_info", { fileId, pageId });

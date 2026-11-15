@@ -4,7 +4,7 @@
 
 Drag with one finger or the mouse to move around. Pinch, Cmd/Ctrl+scroll or `+`/`-` to zoom. Arrow keys step from one artboard to the next, and `0` fits everything.
 
-Images live in Cloudflare R2 and a Cloudflare Worker serves the viewer. Each published page gets an unguessable UUID link. That's not access control: anyone with the link can view it.
+Images live in Cloudflare R2 and a Cloudflare Worker serves the viewer. Each published page gets a short, unguessable link. That's not access control: anyone with the link can view it.
 
 ## Set up your own
 
