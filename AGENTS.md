@@ -8,7 +8,7 @@ Turns one Paper (paper.design) page into a pannable, zoomable web page. A local 
 
 ## Stack
 
-- Worker: `src/index.ts`, configured in `cloudflare.config.ts` (cf CLI, not Wrangler). Worker name and R2 bucket are both `paper-to-web`; `cf deploy` provisions the bucket. Anyone can deploy their own instance. Zeke's is https://paper-to-web.ziki.workers.dev on his personal account. Don't use the name `paper` there: that's a separate paper-previews Worker.
+- Worker: `src/index.ts`, configured in `cloudflare.config.ts` (cf CLI, not Wrangler). Worker name and R2 bucket are both `paper-to-web`; `cf deploy` provisions the bucket. Anyone can deploy their own instance. An optional custom domain comes from `PAPER_TO_WEB_DOMAIN` in `.env`, which `script/deploy` loads. Zeke's instance is https://paper.ziki.boo (also https://paper-to-web.ziki.workers.dev) on his personal account; his `.env` sets the domain and `CLOUDFLARE_ACCOUNT_ID`. Don't use the Worker name `paper` there: that's the separate paper-previews Worker, now only at paper.ziki.workers.dev.
 - Skill: `skills/paper-to-web/SKILL.md` (agentskills.io format, installed with `npx skills add zeke/paper-to-web`) tells agents how to set up an instance and publish. Keep it in sync with the scripts and state layout.
 - Viewer: `src/viewer/` (vanilla JS, no deps). The Worker imports these files with `?raw` and serves `/viewer.js` and `/camera.js` as ES modules. `camera.js` holds the pure pan/zoom math and is unit tested.
 - Publisher: `src/publish.mjs` (Node 24+, macOS, Paper Desktop open). `src/paper.mjs` is the MCP client copied from zeke/paper-previews-starter. `src/manifest.mjs` holds pure helpers. `src/state.mjs` locates the state directory. `src/deploy.mjs` wraps `cf deploy` and saves the Worker URL.
@@ -19,22 +19,22 @@ Turns one Paper (paper.design) page into a pannable, zoomable web page. A local 
 - `script/setup`: bootstrap, then deploy
 - `script/server`: `cf dev` on http://localhost:5173 with local R2
 - `script/publish [--local] [--background <color>] [<paper page url> ...]`: export and upload pages. No URLs republishes every page in `.state/pages.json`.
-- `script/deploy`: `cf deploy`, then saves the printed workers.dev URL and the checkout path to `config.json` in the state directory. Pass `CLOUDFLARE_ACCOUNT_ID` if the login has several accounts.
+- `script/deploy`: `cf deploy`, then saves the public URL (the custom domain if set, else the printed workers.dev URL) and the checkout path to `config.json` in the state directory. Pass `CLOUDFLARE_ACCOUNT_ID` if the login has several accounts.
 - `script/test`: `node --test test/`
 - `script/lint`: typecheck (`cf workers types && tsc`) and `node --check` on JS. No formatter or linter beyond that.
 
 ## Routes
 
 - `/`: 302 to https://github.com/zeke/paper-to-web
-- `/<uuid>`: viewer HTML, 404 if no manifest
-- `/<uuid>.json`: manifest from R2 `pages/<uuid>.json`, `no-store`
+- `/<id>`: viewer HTML, 404 if no manifest. IDs are 12-character base62 (`newPageId` in `src/state.mjs`); UUIDs from before that still route.
+- `/<id>.json`: manifest from R2 `pages/<id>.json`, `no-store`
 - `/img/<sha256>.webp`: image from R2 `img/<sha256>.webp`, immutable
 
 Manifest: `{ title, background, boards: [{ name, x, y, w, h, lo, hi }] }` in Paper world coordinates. `lo` is a 0.5x export, `hi` is 2x. The viewer swaps to `hi` per visible board once `zoom * devicePixelRatio > 0.6`.
 
 ## State
 
-State lives outside the checkout in `~/.config/paper-to-web/` (`$XDG_CONFIG_HOME/paper-to-web/`), so any clone keeps the same URLs. `config.json` has `url` and `checkout`. `pages.json` maps `<fileId>/<pageId>` to its public UUID and optional background. `uploaded-remote.json` lists image hashes already uploaded. The one exception is `.state/uploaded-local.json` in the checkout (gitignored), because local R2 lives in the checkout too. Losing `pages.json` means republishing creates new URLs; it can be rebuilt by matching a manifest's `title` to the Paper page name. Never publish file IDs, node IDs or local paths.
+State lives outside the checkout in `~/.config/paper-to-web/` (`$XDG_CONFIG_HOME/paper-to-web/`), so any clone keeps the same URLs. `config.json` has `url` and `checkout`. `pages.json` maps `<fileId>/<pageId>` to its public page ID and optional background. `uploaded-remote.json` lists image hashes already uploaded. The one exception is `.state/uploaded-local.json` in the checkout (gitignored), because local R2 lives in the checkout too. Losing `pages.json` means republishing creates new URLs; it can be rebuilt by matching a manifest's `title` to the Paper page name. Never publish file IDs, node IDs or local paths.
 
 ## Gotchas
 
@@ -43,6 +43,7 @@ State lives outside the checkout in `~/.config/paper-to-web/` (`$XDG_CONFIG_HOME
 - Paper's WebP exports aren't byte-identical across runs, so republishing re-uploads some unchanged boards. Old images stay in R2 (no cleanup yet).
 - `cf r2 objects put --local` and `cf dev` only share data when the publisher passes `--persist-to .cloudflare/state`.
 - Export writes to `~/Downloads`. Only read the exact `filePath` Paper returns, then delete it.
+- `cloudflare.config.ts` sets `workersDev: true` explicitly. Without it, cf disables workers.dev whenever `domains` is set.
 - Viewer positions each image and label in screen space every frame (no world-level CSS scale) so boards stay crisp at any zoom.
 - Synthetic `PointerEvent`s in browser tests make `setPointerCapture` throw for unknown pointer IDs; stub it in tests. Emulated touch isn't physical-phone testing.
 

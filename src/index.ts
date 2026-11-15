@@ -4,7 +4,8 @@ import viewerJs from "./viewer/viewer.js?raw";
 import cameraJs from "./viewer/camera.js?raw";
 
 const REPO = "https://github.com/zeke/paper-to-web";
-const PAGE = /^\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(\.json)?$/;
+// 12-character base62 IDs, plus UUIDs from before short IDs.
+const PAGE = /^\/([0-9A-Za-z]{12}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(\.json)?$/;
 const IMAGE = /^\/img\/([0-9a-f]{64})\.webp$/;
 const SCRIPTS: Record<string, string> = { "/viewer.js": viewerJs, "/camera.js": cameraJs };
 
