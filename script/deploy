@@ -1,5 +1,5 @@
 #!/bin/sh
-# Deploy the Worker.
+# Deploy the Worker and save its URL for script/publish.
 set -e
 cd "$(dirname "$0")/.."
-exec npx cf deploy "$@"
+exec node src/deploy.mjs "$@"

@@ -1,0 +1,7 @@
+#!/bin/sh
+# Install dependencies and deploy this instance to your Cloudflare account.
+# cf creates the R2 bucket on first deploy. Log in first with `npx cf auth login`.
+set -e
+cd "$(dirname "$0")/.."
+script/bootstrap
+script/deploy "$@"

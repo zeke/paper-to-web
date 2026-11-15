@@ -3,16 +3,15 @@
 // With no URLs, republishes every page published before.
 import { execFile } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseArgs, promisify } from "node:util";
 import { buildManifest, parsePageUrl, webpSize } from "./manifest.mjs";
 import { Paper } from "./paper.mjs";
+import { STATE, readJSON, writeJSON } from "./state.mjs";
 
 const BUCKET = "paper-to-web";
-const BASE_URL = "https://paper-to-web.ziki.workers.dev";
-const STATE = ".state";
 const CF = "node_modules/.bin/cf";
 // Where `cf dev` keeps local resource state, so script/server sees local publishes.
 const LOCAL_STATE = ".cloudflare/state";
@@ -22,19 +21,18 @@ const { values, positionals } = parseArgs({
 	allowPositionals: true,
 	options: { local: { type: "boolean", default: false }, background: { type: "string" } },
 });
-const target = values.local ? "local" : "remote";
 
-const readJSON = async (file, fallback) => JSON.parse(await readFile(file, "utf8").catch(() => JSON.stringify(fallback)));
-const writeJSON = async (file, value) => {
-	await mkdir(STATE, { recursive: true });
-	await writeFile(file, `${JSON.stringify(value, null, "\t")}\n`);
-};
+const { url: BASE_URL } = await readJSON(join(STATE, "config.json"), {});
+if (!values.local && !BASE_URL) {
+	console.error("No deployed Worker URL yet. Run script/setup first.");
+	process.exit(1);
+}
 
 // "<fileId>/<pageId>" -> { id: public UUID, background? }
 const pagesFile = join(STATE, "pages.json");
 const pages = await readJSON(pagesFile, {});
-// Image hashes already uploaded, per target, so reruns skip them.
-const uploadedFile = join(STATE, `uploaded-${target}.json`);
+// Image hashes already uploaded, so reruns skip them. Local R2 lives in this checkout, so its list does too.
+const uploadedFile = values.local ? ".state/uploaded-local.json" : join(STATE, "uploaded-remote.json");
 const uploaded = new Set(await readJSON(uploadedFile, []));
 
 const keys = positionals.length
